@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Collateralized Loan Web App</title>
+  </head>
+  <body>
+    <h1>Collateralized Loan Web App</h1>
+
+    <h2>Available Assets</h2>
+    <ul id="available-assets"></ul>
+
+    <h2>Request Loan</h2>
+    <form id="request-loan-form">
+      <label for="collateral-asset-id">Collateral Asset ID:</label>
+      <input type="text" id="collateral-asset-id" name="collateral-asset-id">
+
+      <label for="loan-amount">Loan Amount:</label>
+      <input type="text" id="loan-amount" name="loan-amount">
+
+      <label for="interest-rate">Interest Rate:</label>
+      <input type="text" id="interest-rate" name="interest-rate">
+
+      <label for="due-date">Due Date:</label>
+      <input type="text" id="due-date" name="due-date">
+
+      <button type="submit">Request Loan</button>
+    </form>
+
+    <h2>Loan Terms</h2>
+    <ul id="loan-terms"></ul>
+
+    <h2>Fund Loan</h2>
+    <form id="fund-loan-form">
+      <label for="loan-id">Loan ID:</label>
+      <input type="text" id="loan-id" name="loan-id">
+
+      <label for="loan-amount">Loan Amount:</label>
+      <input type="text" id="loan-amount" name="loan-amount">
+
+      <button type="submit">Fund Loan</button>
+    </form>
+
+    <h2>My Loans</h2>
+    <ul id="my-loans"></ul>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.3.5/dist/web3.min.js"></script>
+    <script>
+      // Wait for page to load
+      window.addEventListener('load', async () => {
+        // Check if Web3 has been injected by the browser (Mist/MetaMask)
+        if (typeof window.ethereum !== 'undefined') {
+          // Web3 provider exists, create Web3 object
+          window.web3 = new Web3(window.ethereum);
+
+          try {
+            // Request account access if needed
+            await window.ethereum.enable();
+
+            // Account access granted, get network ID
+            const networkId = await web3.eth.net.getId();
+            console.log(`Connected to Ethereum network (network ID: ${networkId})`);
+
+            // Load CollateralizedLoan contract
+            const contractAddress = '0x123...'; // Replace with actual contract address
+            const contractAbi = [/* Replace with actual contract ABI */];
+            const contract = new web3.eth.Contract(contractAbi, contractAddress);
+
+            // Get available assets
+            const availableAssets = await contract.methods.getAvailableAssets().call();
+            console.log(`Available assets: ${JSON.stringify(availableAssets)}`);
+
+            // Display available assets
+            const availableAssetsList = document.getElementById('available-assets');
+            for (const asset of availableAssets) {
+              const listItem = document.createElement('li');
+              listItem.innerHTML = `${asset.id}: ${asset.name} (${asset.price} ETH)`;
+              availableAssetsList.appendChild(listItem);
+            }
+
+            // Request loan
+            const requestLoanForm = document.getElementById('request-loan-form');
+            requestLoanForm.addEventListener('submit', async (event) => {
+              event.preventDefault();
+
+              const collateralAssetId = document.getElementById('collateral-asset-id').value;
+              const loanAmount = document.getElementById('loan-amount').value;
+              const interestRate = document.getElementById('interest-rate').value;
+              const dueDate = document.getElementById('due-date').value;
+
+              console.log(`Requesting loan for collateral asset ID ${collateralAssetId} with amount ${loanAmount} ETH, interest rate ${interestRate}%, and due date ${dueDate}`);
+
+              try {
+                const result = await contract.methods.requestLoan(collateralAssetId, loanAmount, interestRate, dueDate).send({from: web3.eth.defaultAccount});
+                console.log(`Loan request successful. Transaction hash: ${result.transactionHash}`);
+
+                // Display loan terms
+                const loanTermsList = document.getElementById('loan-terms');
+                const loanTermsItem = document.createElement('li');
+                loanTermsItem.innerHTML = `Loan ID: ${result.events.LoanRequested.returnValues.loanId}, Collateral Asset ID: ${collateralAssetId}, Amount: ${loanAmount} ETH, Interest Rate: ${interestRate}%, Due Date: ${dueDate}`;
+                loanTermsList.appendChild(loanTermsItem);
+
+              } catch (error) {
+                console.error(`Error requesting loan: ${error}`);
+              }
+            });
+
+            // Fund loan
+            const fundLoanForm = document.getElementById('fund-loan-form');
+            fundLoanForm.addEventListener('submit', async (event) => {
+              event.preventDefault();
+
+              const loanId = document.getElementById('loan-id').value;
+              const loanAmount = document.getElementById('loan-amount').value;
+
+              console.log(`Funding loan ID ${loanId} with amount ${loanAmount} ETH`);
+
+              try {
+                const result = await contract.methods.fundLoan(loanId).send({from: web3.eth.defaultAccount, value: web3.utils.toWei(loanAmount, 'ether')});
+                console.log(`Loan funding successful. Transaction hash: ${result.transactionHash}`);
+
+                // Display my loans
+                const myLoansList = document.getElementById('my-loans');
+                const myLoansItem = document.createElement('li');
+                myLoansItem.innerHTML = `Loan ID: ${loanId}, Amount: ${loanAmount} ETH`;
+                myLoansList.appendChild(myLoansItem);
+
+              } catch (error) {
+                console.error(`Error funding loan: ${error}`);
+              }
+            });
+
+            // Get my loans
+            const myLoans = await contract.methods.getMyLoans().call({from: web3.eth.defaultAccount});
+            console.log(`My loans: ${JSON.stringify(myLoans)}`);
+
+            // Display my loans
+            const myLoansList = document.getElementById('my-loans');
+            for (const loan of myLoans) {
+              const listItem = document.createElement('li');
+              listItem.innerHTML = `Loan ID: ${loan.id}, Collateral Asset ID: ${loan.collateralAssetId}, Amount: ${loan.amount} ETH, Interest Rate: ${loan.interestRate}%, Due Date: ${loan.dueDate}`;
+              myLoansList.appendChild(listItem);
+            }
+          } catch (error) {
+            // Account access denied
+            console.error(`Error: ${error}`);
+          }
+        } else {
+          // Web3 provider not found
+          console.error('Please install MetaMask to use this app');
+        }
+      });
+    </script>
+           
